@@ -1,27 +1,29 @@
 <script setup lang="ts">
 import { reactive, computed } from "vue"
 import TodoItem from "../components/TodoItem.vue"
+import { useQuery, useResult } from "@vue/apollo-composable"
+import { SELECT_TODOS } from "../graphql-operations"
 
-const privateTodos = [
-    {
-        id: "1",
-        title: "This is private todo 1",
-        is_completed: true,
-        is_public: false,
+const selectTodosVariables = {
+    where: {
+        is_public: { _eq: false }
     },
-    {
-        id: "2",
-        title: "This is private todo 2",
-        is_completed: false,
-        is_public: false,
-    },
-]
+    order_by: {
+        created_at: "desc"
+    }
+}
+
+const privateTodosQuery = useQuery(SELECT_TODOS, selectTodosVariables)
+// const privateTodos = useResult(privateTodosQuery.result, [], 
+//     (data) => data?.todos)
+
+const privateTodos = computed(() => privateTodosQuery.result.value?.todos ?? [])
 
 const state = reactive({
     type: "private",
     filterType: "all",
     filteredTodos: computed(() => {
-        return privateTodos.filter((todo) => {
+        return privateTodos.value.filter((todo) => {
             switch (state.filterType) {
                 case "completed":
                     return todo.is_completed
@@ -32,7 +34,7 @@ const state = reactive({
             }
         })
     }),
-    activeTodos: computed(() => privateTodos.filter((todo) => !todo.is_completed)),
+    activeTodos: computed(() => privateTodos.value.filter((todo) => !todo.is_completed)),
     remainingTodos: computed(() => state.activeTodos.length),
 })
 
@@ -58,6 +60,10 @@ async function clearCompleted() {
 
 <template>
     <div>
+        <div v-if="privateTodosQuery.loading?.value">Loading...</div>
+        <div v-if="privateTodosQuery.error?.value">
+            Error: {{ privateTodosQuery.error?.value?.message }}
+        </div>
         <div class="todoListwrapper">
             <TodoItem :todos="state.filteredTodos" :type="state.type" />
         </div>
